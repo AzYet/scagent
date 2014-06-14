@@ -24,6 +24,11 @@
     </dependency>
     <dependency>
       <groupId>org.opendaylight.controller</groupId>
+      <artifactId>hosttracker</artifactId>
+      <version>0.5.2-SNAPSHOT</version>
+    </dependency>
+    <dependency>
+      <groupId>org.opendaylight.controller</groupId>
       <artifactId>sal</artifactId>
       <version>0.7.1-SNAPSHOT</version>
     </dependency>
@@ -57,17 +62,19 @@
         <extensions>true</extensions>
         <configuration>
           <instructions>
-            <Import-Package>org.opendaylight.controller.sal.routing,
-							org.opendaylight.controller.scagent.service.api,
-							org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924,
+            <Import-Package>org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924,
 							org.apache.commons.logging,
 							com.sun.jersey.spi.container.servlet,
+							org.opendaylight.controller.hosttracker,
+							org.opendaylight.controller.hosttracker.hostAware,
+							org.opendaylight.controller.sal.routing,
+							org.opendaylight.controller.scagent.service.api,
 							org.opendaylight.controller.topologymanager,
 							org.opendaylight.controller.containermanager,
 							org.opendaylight.controller.northbound.commons,
 							org.opendaylight.controller.northbound.commons.exception,
 							org.opendaylight.controller.northbound.commons.utils,
-						    org.opendaylight.controller.sal.core,
+							org.opendaylight.controller.sal.core,
 							org.opendaylight.controller.sal.utils,
 							org.opendaylight.controller.sal.authorization,
 							org.opendaylight.controller.sal.packet.address,
