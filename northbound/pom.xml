@@ -22,6 +22,7 @@
       <artifactId>commons.northbound</artifactId>
       <version>0.4.2-SNAPSHOT</version>
     </dependency>
+
     <dependency>
       <groupId>org.opendaylight.controller</groupId>
       <artifactId>hosttracker</artifactId>
@@ -52,6 +53,11 @@
       <version>7.0.42</version>
     </dependency>
 
+    <dependency>
+      <groupId>org.opendaylight.controller.thirdparty</groupId>
+      <artifactId>org.openflow.openflowj</artifactId>
+    </dependency>
+
   </dependencies>
   <build>
     <plugins>
@@ -75,7 +81,10 @@
 							org.opendaylight.controller.northbound.commons.exception,
 							org.opendaylight.controller.northbound.commons.utils,
 							org.opendaylight.controller.sal.core,
+							org.opendaylight.controller.sal.action,
+							org.opendaylight.controller.sal.match,
 							org.opendaylight.controller.sal.utils,
+							org.opendaylight.controller.sal.flowprogrammer,
 							org.opendaylight.controller.sal.authorization,
 							org.opendaylight.controller.sal.packet.address,
 							javax.ws.rs,
@@ -87,6 +96,8 @@
 							com.fasterxml.jackson.jaxrs.base,
 							com.fasterxml.jackson.jaxrs.json,
 							!org.codehaus.enunciate.jaxrs</Import-Package>
+            <Embed-Dependency>org.openflow.openflowj</Embed-Dependency>
+
             <Web-ContextPath>/controller/nb/v2</Web-ContextPath>
           </instructions>
           <manifestLocation>${project.basedir}/src/main/resources/META-INF</manifestLocation>
