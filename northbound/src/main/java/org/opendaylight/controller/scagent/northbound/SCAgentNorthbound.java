@@ -4,6 +4,8 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -22,11 +24,14 @@ import org.codehaus.enunciate.jaxrs.TypeHint;
 import org.opendaylight.controller.hosttracker.IfIptoHost;
 import org.opendaylight.controller.hosttracker.hostAware.HostNodeConnector;
 import org.opendaylight.controller.northbound.commons.RestMessages;
+import org.opendaylight.controller.northbound.commons.exception.InternalServerErrorException;
 import org.opendaylight.controller.northbound.commons.exception.ServiceUnavailableException;
 import org.opendaylight.controller.sal.action.Action;
 import org.opendaylight.controller.sal.action.Controller;
+import org.opendaylight.controller.sal.core.ConstructionException;
 import org.opendaylight.controller.sal.core.Edge;
 import org.opendaylight.controller.sal.core.Node;
+import org.opendaylight.controller.sal.core.NodeConnector;
 import org.opendaylight.controller.sal.flowprogrammer.Flow;
 import org.opendaylight.controller.sal.flowprogrammer.IFlowProgrammerService;
 import org.opendaylight.controller.sal.match.Match;
@@ -35,13 +40,22 @@ import org.opendaylight.controller.sal.routing.IRouting;
 import org.opendaylight.controller.sal.utils.HexEncode;
 import org.opendaylight.controller.sal.utils.ServiceHelper;
 import org.opendaylight.controller.sal.utils.Status;
+import org.opendaylight.controller.scagent.northbound.utils.BYODInitConfig;
+import org.opendaylight.controller.scagent.northbound.utils.BYODInitConfig.SwitchPort;
+import org.opendaylight.controller.scagent.northbound.utils.Cypher;
+import org.opendaylight.controller.scagent.northbound.utils.FindHostsResult;
+import org.opendaylight.controller.scagent.northbound.utils.InputHost;
+import org.opendaylight.controller.scagent.northbound.utils.MatchArguments;
+import org.opendaylight.controller.scagent.northbound.utils.PolicyActionType;
+import org.opendaylight.controller.scagent.northbound.utils.PolicyCommand;
+import org.opendaylight.controller.scagent.northbound.utils.PolicyCommandDeployed;
+import org.opendaylight.controller.scagent.northbound.utils.PolicyCommandRelated;
+import org.opendaylight.controller.scagent.northbound.utils.SwitchFlowModCount;
 import org.opendaylight.controller.scagent.service.api.SCAgentSampleServiceAPI;
+import org.opendaylight.controller.switchmanager.ISwitchManager;
 import org.opendaylight.controller.topologymanager.ITopologyManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.sun.jersey.api.NotFoundException;
-
 
 @Path("/")
 public class SCAgentNorthbound {
@@ -50,6 +64,16 @@ public class SCAgentNorthbound {
 	 */
 	public static Logger logger = LoggerFactory
 			.getLogger(SCAgentNorthbound.class);
+
+	// 将所有策略保存在内存中
+	public static Map<String, PolicyCommandDeployed> policyCommandsDeployed = new HashMap<String, PolicyCommandDeployed>();
+	static Map<String, PolicyCommand> sourcePolicyCommandsWithoutInPort = new HashMap<String, PolicyCommand>();
+	// <DPID,SwitchFlowModCount>
+	static Map<Long, Map<String, SwitchFlowModCount>> switchFlowModCountMap = new HashMap<Long, Map<String, SwitchFlowModCount>>();
+	// <FlowModId,SwitchFlowModCount>
+	static Map<String, SwitchFlowModCount> flowModCountMap = new HashMap<String, SwitchFlowModCount>();
+	// <FlowModId,SwitchFlowModCount>
+	static Map<String, SwitchFlowModCount> globalFlowModCountMap = new HashMap<String, SwitchFlowModCount>();
 
 	@Path("/scagent/{param}")
 	@GET
@@ -195,7 +219,7 @@ public class SCAgentNorthbound {
 	@StatusCodes({ @ResponseCode(code = 200, condition = "operational"),
 			@ResponseCode(code = 503, condition = "Internal error"),
 			@ResponseCode(code = 503, condition = "misfunctional") })
-	public Response postHandler(@PathParam(value = "format") String param,
+	public Response testPostHandler(@PathParam(value = "format") String param,
 			@TypeHint(InputHost.class) InputHost inHost) {
 
 		IfIptoHost hostTracker = (IfIptoHost) ServiceHelper.getGlobalInstance(
@@ -211,8 +235,7 @@ public class SCAgentNorthbound {
 			HostNodeConnector nodeConnector = hostTracker.hostFind(InetAddress
 					.getByName(inHost.getHostIp()));
 			if (nodeConnector == null) {
-				logger.error("Cannot find host by ip: "
-						+ inHost.getHostIp());
+				logger.error("Cannot find host by ip: " + inHost.getHostIp());
 				return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
 						.build();
 			}
@@ -243,5 +266,196 @@ public class SCAgentNorthbound {
 		}
 
 		return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+	}
+
+	@Path("/scagent/policyaction/BYOD_INIT/{id}")
+	@POST
+	@Consumes({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
+	@Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
+	@TypeHint(BYODInitConfig.class)
+	@StatusCodes({ @ResponseCode(code = 200, condition = "operational"),
+			@ResponseCode(code = 503, condition = "Internal error"),
+			@ResponseCode(code = 503, condition = "misfunctional") })
+	public Response createByodInit(@PathParam(value = "id") String param,
+			@TypeHint(BYODInitConfig.class) BYODInitConfig config) {
+
+		logger.info("received BYOD_INIT command = {}", config.toString());
+		List<PolicyCommand> initCommands = generateBYODInitCommands(config);
+		for (PolicyCommand p : initCommands) {
+			processSingleFlowCommand(p);
+		}
+		return Response.status(Response.Status.OK).build();
+
+	}
+
+	public String processSingleFlowCommand(PolicyCommand policyCommand) {
+		IFlowProgrammerService flowProgrammer = (IFlowProgrammerService) ServiceHelper
+				.getGlobalInstance(IFlowProgrammerService.class, this);
+		ISwitchManager switchManager = (ISwitchManager) ServiceHelper
+				.getGlobalInstance(ISwitchManager.class, this);
+		if (flowProgrammer == null || switchManager == null) {
+			throw new ServiceUnavailableException(
+					"SwitchManager or FlowProgrammer "
+							+ RestMessages.SERVICEUNAVAILABLE.toString());
+		}
+		Node node = null;
+		try {
+			node = new Node("OF", policyCommand.getDpid());
+		} catch (ConstructionException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		Match match = policyCommand.getMatch().toODLMatch();
+		if (policyCommand.getInPort() != 0) {
+			// should pass type NodeConnector
+			Set<NodeConnector> upNodeConnectors = switchManager
+					.getUpNodeConnectors(node);
+			if (upNodeConnectors.isEmpty()) {
+				logger.info("no node connectors for node :{}", node.getID());
+			}
+			boolean isFoundNodeConnector = false;
+			for (NodeConnector nodeConnector : upNodeConnectors) {
+				if ((short) nodeConnector.getID() == policyCommand.getInPort()) {
+					isFoundNodeConnector = true;
+					match.setField(MatchType.IN_PORT, nodeConnector);
+					break;
+				}
+			}
+			if (!isFoundNodeConnector) {
+				throw new InternalServerErrorException(
+						String.format(
+								"cannot find NodeConnector with dpid: %d and inPort = %d",
+								policyCommand.getDpid(),
+								policyCommand.getInPort()));
+			}
+		}
+		ArrayList<Action> actions = new ArrayList<Action>();
+		if (policyCommand.getType() == PolicyActionType.ALLOW_FLOW
+				|| policyCommand.getType() == PolicyActionType.BYOD_ALLOW) {
+			actions.add(new Controller());
+		}
+		Flow flow = new Flow(match, actions);
+		flow.setHardTimeout((short) policyCommand.getHardTimeout());
+		flow.setIdleTimeout((short) policyCommand.getIdleTimeout());
+		flow.setPriority((short) policyCommand.getCommandPriority());
+		flow.setId(0xabcdeL);
+		if (node == null) {
+			throw new InternalServerErrorException(String.format(
+					"cannot find Node with dpid: %d", policyCommand.getDpid()));
+		}
+		logger.info("adding flow with node = {} , flow = {}",
+				node.getNodeIDString(), flow.toString());
+		Status status = flowProgrammer.addFlow(node, flow);
+		if (status.isSuccess()) {
+			String flowModId = Cypher.getMD5(new String[] {
+					node.getNodeIDString(), policyCommand.getInPort() + "",
+					flow.toString() });
+			Map<String, SwitchFlowModCount> sMap = switchFlowModCountMap
+					.get(flowModId);
+
+			if (sMap == null) {
+				sMap = new HashMap<String, SwitchFlowModCount>();
+				switchFlowModCountMap.put(policyCommand.getDpid(), sMap);
+			}
+			SwitchFlowModCount sfmc = sMap.get(flowModId);
+			if (sfmc == null) {
+				sfmc = new SwitchFlowModCount(policyCommand.getDpid(), flow, 1);
+				sMap.put(flowModId, sfmc);
+				globalFlowModCountMap.put(flowModId, sfmc);
+			} else {
+				sfmc.increaseCount();
+			}
+			ArrayList<String> flowModIds = new ArrayList<String>();
+			flowModIds.add(flowModId);
+			policyCommandsDeployed.put(policyCommand.getId(),
+					new PolicyCommandDeployed(flowModId, policyCommand,
+							new HashMap<String, PolicyCommandRelated>(),
+							flowModIds));
+			return flowModId;
+		} else {
+			throw new InternalServerErrorException(String.format(
+					"cannot process flow command with id: %s",
+					policyCommand.getId()));
+		}
+	}
+
+	/**
+	 * add flows to flow priority pattern action 1) 0 all controller 2) 1 inport
+	 * drop 3) 2 inport,dhcp controller 4) 2 inport,dns controller 5) 2
+	 * inport,arp controller 6) 2 inport,http controller
+	 **/
+	public List<PolicyCommand> generateBYODInitCommands(BYODInitConfig config) {
+		ArrayList<PolicyCommand> initCommands = new ArrayList<PolicyCommand>();
+		for (SwitchPort switchPort : config.getSwitchPorts()) {
+			// priority=0 , inPort , controller
+			// PolicyCommand(String id, String policyName,
+			// int commandPriority, PolicyActionType type,
+			// MatchArguments match, List<SecurityDevice> devices,
+			// int idleTimeout, int hardTimeout, long dpid, short inPort);
+			PolicyCommand controllerAllCommand = new PolicyCommand("ByodInit_"
+					+ switchPort.getDpid() + ":" + switchPort.getInPort()
+					+ "0_" + config.getId(), "controllerAllCommand", 0,
+					PolicyActionType.ALLOW_FLOW, new MatchArguments(), null, 0,
+					0, switchPort.getDpid(), (short) 0);
+			initCommands.add(controllerAllCommand);
+			// priority=1 , inport , drop
+			MatchArguments inPortMatch = new MatchArguments();
+			inPortMatch.setInputPort(switchPort.getInPort());
+			PolicyCommand dropAllCommand = new PolicyCommand("ByodInit_"
+					+ switchPort.getDpid() + ":" + switchPort.getInPort()
+					+ "1_" + config.getId(), "dropAllCommand", 1,
+					PolicyActionType.DROP_FLOW, inPortMatch, null, 0, 0,
+					switchPort.getDpid(), switchPort.getInPort());
+			initCommands.add(dropAllCommand);
+			// allow arp, priorty = 2
+			MatchArguments allowArpMatch = new MatchArguments();
+			allowArpMatch.setDataLayerType((short) 0x0806);
+			allowArpMatch.setInputPort(switchPort.getInPort());
+			PolicyCommand allowArpCommand = new PolicyCommand("ByodInit_"
+					+ switchPort.getDpid() + ":" + switchPort.getInPort()
+					+ "2_" + config.getId(), "AllowArp", 2,
+					PolicyActionType.ALLOW_FLOW, allowArpMatch, null, 0, 0,
+					switchPort.getDpid(), switchPort.getInPort());
+			initCommands.add(allowArpCommand);
+			// allow dhcp, priorty = 2
+			MatchArguments allowDhcpMatch = new MatchArguments();
+			allowDhcpMatch.setDataLayerType((short) 0x0800);
+			allowDhcpMatch.setNetworkProtocol((byte) 0x11);
+			allowDhcpMatch.setTransportDestination((short) 67);
+			allowArpMatch.setInputPort(switchPort.getInPort());
+			PolicyCommand allowDhcpCommand = new PolicyCommand("ByodInit_"
+					+ switchPort.getDpid() + ":" + switchPort.getInPort()
+					+ "3_" + config.getId(), "AllowDHCP", 2,
+					PolicyActionType.ALLOW_FLOW, allowDhcpMatch, null, 0, 0,
+					switchPort.getDpid(), switchPort.getInPort());
+			initCommands.add(allowDhcpCommand);
+
+			// allow dns, priorty = 2
+			MatchArguments allowDnsMatch = new MatchArguments();
+			allowDnsMatch.setDataLayerType((short) 0x0800);
+			allowDnsMatch.setNetworkProtocol((byte) 0x11);
+			allowDnsMatch.setTransportDestination((short) 53);
+			allowArpMatch.setInputPort(switchPort.getInPort());
+			PolicyCommand allowDnsCommand = new PolicyCommand("ByodInit_"
+					+ switchPort.getDpid() + ":" + switchPort.getInPort()
+					+ "4_" + config.getId(), "AllowDns", 2,
+					PolicyActionType.ALLOW_FLOW, allowDnsMatch, null, 0, 0,
+					switchPort.getDpid(), switchPort.getInPort());
+			initCommands.add(allowDnsCommand);
+
+			// redirect tcp 80
+			MatchArguments httpMatch = new MatchArguments();
+			httpMatch.setDataLayerType((short) 0x0800);
+			httpMatch.setNetworkProtocol((byte) 0x6);
+			httpMatch.setTransportDestination((short) 80);
+			allowArpMatch.setInputPort(switchPort.getInPort());
+			PolicyCommand redirectHpptCommand = new PolicyCommand("ByodInit_"
+					+ switchPort.getDpid() + ":" + switchPort.getInPort()
+					+ "5_" + config.getId(), "redirectHttp", 2,
+					PolicyActionType.ALLOW_FLOW, httpMatch, null, 0, 0,
+					switchPort.getDpid(), switchPort.getInPort());
+			initCommands.add(redirectHpptCommand);
+		}
+		return initCommands;
 	}
 }
