@@ -1,7 +1,41 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-  <parent>
+    <properties>
+        <maven-bundle-plugin.Import-Package>
+            org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924,
+            org.apache.commons.logging,
+            com.sun.jersey.spi.container.servlet,
+            org.opendaylight.controller.hosttracker,
+            org.opendaylight.controller.hosttracker.hostAware,
+            org.opendaylight.controller.sal.routing,
+            org.opendaylight.controller.scagent.service.api,
+            org.opendaylight.controller.topologymanager,
+            org.opendaylight.controller.switchmanager,
+            org.opendaylight.controller.containermanager,
+            org.opendaylight.controller.northbound.commons,
+            org.opendaylight.controller.northbound.commons.exception,
+            org.opendaylight.controller.northbound.commons.utils,
+            org.opendaylight.controller.sal.core,
+            org.opendaylight.controller.sal.action,
+            org.opendaylight.controller.sal.match,
+            org.opendaylight.controller.sal.utils,
+            org.opendaylight.controller.sal.flowprogrammer,
+            org.opendaylight.controller.sal.authorization,
+            org.opendaylight.controller.sal.packet.address,
+            javax.ws.rs,
+            javax.ws.rs.core,
+            javax.xml.bind.annotation,
+            javax.xml.bind,
+            org.slf4j,
+            org.apache.catalina.filters,
+            com.fasterxml.jackson.jaxrs.base,
+            com.fasterxml.jackson.core,
+            com.fasterxml.jackson.jaxrs.json,
+            !org.codehaus.enunciate.jaxrs
+        </maven-bundle-plugin.Import-Package>
+    </properties>
+    <parent>
     <groupId>org.opendaylight.controller</groupId>
     <artifactId>commons.opendaylight</artifactId>
     <version>1.4.2-SNAPSHOT</version>
@@ -74,35 +108,8 @@
         <extensions>true</extensions>
         <configuration>
           <instructions>
-            <Import-Package>org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924,
-							org.apache.commons.logging,
-							com.sun.jersey.spi.container.servlet,
-							org.opendaylight.controller.hosttracker,
-							org.opendaylight.controller.hosttracker.hostAware,
-							org.opendaylight.controller.sal.routing,
-							org.opendaylight.controller.scagent.service.api,
-							org.opendaylight.controller.topologymanager,
-							org.opendaylight.controller.switchmanager,
-							org.opendaylight.controller.containermanager,
-							org.opendaylight.controller.northbound.commons,
-							org.opendaylight.controller.northbound.commons.exception,
-							org.opendaylight.controller.northbound.commons.utils,
-							org.opendaylight.controller.sal.core,
-							org.opendaylight.controller.sal.action,
-							org.opendaylight.controller.sal.match,
-							org.opendaylight.controller.sal.utils,
-							org.opendaylight.controller.sal.flowprogrammer,
-							org.opendaylight.controller.sal.authorization,
-							org.opendaylight.controller.sal.packet.address,
-							javax.ws.rs,
-							javax.ws.rs.core,
-							javax.xml.bind.annotation,
-							javax.xml.bind,
-							org.slf4j,
-							org.apache.catalina.filters,
-							com.fasterxml.jackson.jaxrs.base,
-							com.fasterxml.jackson.jaxrs.json,
-							!org.codehaus.enunciate.jaxrs</Import-Package>
+            <Import-Package>${maven-bundle-plugin.Import-Package}</Import-Package>
+            <Export-Package>org.opendaylight.controller.scagent.northbound.utils</Export-Package>
             <Embed-Dependency>org.openflow.openflowj</Embed-Dependency>
 
             <Web-ContextPath>/controller/nb/v2</Web-ContextPath>
