@@ -73,7 +73,7 @@ public class SCAgentNorthbound {
     public FindHostsResult scagentResource(
             @PathParam(value = "param") String param) {
 
-        ISecurityControllerAgentService scSmplService = (ISecurityControllerAgentService) ServiceHelper
+        ISecurityControllerAgentService scAgentService = (ISecurityControllerAgentService) ServiceHelper
                 .getGlobalInstance(ISecurityControllerAgentService.class, this);
         ITopologyManager topologyManager = (ITopologyManager) ServiceHelper
                 .getGlobalInstance(ITopologyManager.class, this);
@@ -184,14 +184,14 @@ public class SCAgentNorthbound {
                 }
             }
         } else {
-            if (scSmplService == null) {
+            if (scAgentService == null) {
                 // service not found.
-                // return Response.ok(new String("No scagent service"))
-                // .status(500).build();
+                logger.info("no scagent service");
+                return null;
             }
             String res = null;
-            if ((res = scSmplService.sayHello(param)) != null) {
-                // return Response.ok(new String(res)).build();
+            if ((res = scAgentService.sayHello(param)) != null) {
+                logger.info(res);
             }
 
         }
