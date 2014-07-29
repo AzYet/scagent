@@ -8,17 +8,17 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 public class PolicyCommand  implements Comparable<PolicyCommand>{
 	protected String id;
 	protected String policyName;
-	protected int commandPriority;
+	protected short commandPriority;
 	protected PolicyActionType type;
 	protected MatchArguments match;
 	protected List<SecurityDevice> devices;
-	protected int idleTimeout;
-	protected int hardTimeout;
+	protected short idleTimeout;
+	protected short hardTimeout;
 	protected long dpid;
 	protected short inPort;
 
 	public PolicyCommand(String policyCommandId, String policyName,
-			int commandPriority, PolicyActionType type, MatchArguments match,
+			short commandPriority, PolicyActionType type, MatchArguments match,
 			List<SecurityDevice> devices) {
 		super();
 		this.id = policyCommandId;
@@ -29,9 +29,9 @@ public class PolicyCommand  implements Comparable<PolicyCommand>{
 		this.devices = devices;
 	}
 
-	public PolicyCommand(String id, String policyName, int commandPriority,
+	public PolicyCommand(String id, String policyName, short commandPriority,
 			PolicyActionType type, MatchArguments match,
-			List<SecurityDevice> devices, int idleTimeout, int hardTimeout) {
+			List<SecurityDevice> devices, short idleTimeout, short hardTimeout) {
 		super();
 		this.id = id;
 		this.policyName = policyName;
@@ -43,9 +43,9 @@ public class PolicyCommand  implements Comparable<PolicyCommand>{
 		this.hardTimeout = hardTimeout;
 	}
 
-	public PolicyCommand(String id, String policyName, int commandPriority,
+	public PolicyCommand(String id, String policyName, short commandPriority,
 			PolicyActionType type, MatchArguments match,
-			List<SecurityDevice> devices, int idleTimeout, int hardTimeout,
+			List<SecurityDevice> devices, short idleTimeout, short hardTimeout,
 			long dpid, short inPort) {
 		super();
 		this.id = id;
@@ -181,10 +181,10 @@ public class PolicyCommand  implements Comparable<PolicyCommand>{
 	public void setPolicyName(String policyName) {
 		this.policyName = policyName;
 	}
-	public int getCommandPriority() {
+	public short getCommandPriority() {
 		return commandPriority;
 	}
-	public void setCommandPriority(int commandPriority) {
+	public void setCommandPriority(short commandPriority) {
 		this.commandPriority = commandPriority;
 	}
 	public PolicyActionType getType() {
@@ -208,22 +208,37 @@ public class PolicyCommand  implements Comparable<PolicyCommand>{
 		this.devices = devices;
 	}
 
-	public int getIdleTimeout() {
+	public short getIdleTimeout() {
 		return idleTimeout;
 	}
 
-	public void setIdleTimeout(int idleTimeout) {
+	public void setIdleTimeout(short idleTimeout) {
 		this.idleTimeout = idleTimeout;
 	}
 
-	public int getHardTimeout() {
+	public short getHardTimeout() {
 		return hardTimeout;
 	}
 
-	public void setHardTimeout(int hardTimeout) {
+	public void setHardTimeout(short hardTimeout) {
 		this.hardTimeout = hardTimeout;
 	}
 
+    public short getInPort() {
+        return inPort;
+    }
+
+    public void setInPort(short inPort) {
+        this.inPort = inPort;
+    }
+
+    public long getDpid() {
+        return dpid;
+    }
+
+    public void setDpid(long swIPAddress) {
+        this.dpid = swIPAddress;
+    }
 
 	@Override
 	public String toString() {
@@ -239,19 +254,4 @@ public class PolicyCommand  implements Comparable<PolicyCommand>{
 		return commandPriority == o.commandPriority ? 0 :(commandPriority > o.commandPriority ? 1 : -1);
 	}
 
-	public short getInPort() {
-		return inPort;
-	}
-
-	public void setInPort(short inPort) {
-		this.inPort = inPort;
-	}
-
-	public long getDpid() {
-		return dpid;
-	}
-
-	public void setDpid(long swIPAddress) {
-		this.dpid = swIPAddress;
-	}
 }

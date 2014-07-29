@@ -8,49 +8,26 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class BYODInitConfig {
-	@JsonIgnoreProperties(ignoreUnknown = true)
-	public static class SwitchPort {
-
-		private long dpid;
-		private short inPort;
-
-		public SwitchPort() {
-			super();
-		}
-
-		public long getDpid() {
-			return dpid;
-		}
-
-		public void setDpid(long dpid) {
-			this.dpid = dpid;
-		}
-
-		public short getInPort() {
-			return inPort;
-		}
-
-		public void setInPort(short inPort) {
-			this.inPort = inPort;
-		}
-
-		@Override
-		public String toString() {
-			return "SwitchPorts [dpid=" + dpid + ", inPort=" + inPort + "]";
-		}
-	}
 
 	private String id;
 	private String commandName;
 	private PolicyActionType type;
-	private List<SwitchPort> switchPorts;
+    private long dpid;
+    private short inPort;
 	private String serverIp;
 	private String serverMac;
 	private String network;
-	private int mask;
+	private byte mask;
 	private short commandPriority;
-	private int idleTimeout;
-	private int hardTimeout;
+	private short idleTimeout;
+	private short hardTimeout;
+
+    public BYODRedirectCommand toByodRedirectCommand(){
+        BYODRedirectCommand byodRedirectCommand = new BYODRedirectCommand(
+                id,commandName,commandPriority,type,null,null,idleTimeout,hardTimeout,dpid,
+                inPort,network,mask,serverIp,serverMac);
+    return byodRedirectCommand;
+    }
 
 	public BYODInitConfig() {
 		super();
@@ -80,13 +57,6 @@ public class BYODInitConfig {
 		this.type = type;
 	}
 
-	public List<SwitchPort> getSwitchPorts() {
-		return switchPorts;
-	}
-
-	public void setSwitchPorts(List<SwitchPort> switchPorts) {
-		this.switchPorts = switchPorts;
-	}
 
 	public String getServerIp() {
 		return serverIp;
@@ -112,11 +82,11 @@ public class BYODInitConfig {
 		this.network = network;
 	}
 
-	public int getMask() {
+	public byte getMask() {
 		return mask;
 	}
 
-	public void setMask(int mask) {
+	public void setMask(byte mask) {
 		this.mask = mask;
 	}
 
@@ -128,26 +98,42 @@ public class BYODInitConfig {
 		this.commandPriority = commandPriority;
 	}
 
-	public int getIdleTimeout() {
+	public short getIdleTimeout() {
 		return idleTimeout;
 	}
 
-	public void setIdleTimeout(int idleTimeout) {
+	public void setIdleTimeout(short idleTimeout) {
 		this.idleTimeout = idleTimeout;
 	}
 
-	public int getHardTimeout() {
+	public short getHardTimeout() {
 		return hardTimeout;
 	}
 
-	public void setHardTimeout(int hardTimeout) {
+	public void setHardTimeout(short hardTimeout) {
 		this.hardTimeout = hardTimeout;
 	}
 
-	@Override
+    public long getDpid() {
+        return dpid;
+    }
+
+    public void setDpid(long dpid) {
+        this.dpid = dpid;
+    }
+
+    public short getInPort() {
+        return inPort;
+    }
+
+    public void setInPort(short inPort) {
+        this.inPort = inPort;
+    }
+
+    @Override
 	public String toString() {
 		return "BYODInitConfig [id=" + id + ", commandName=" + commandName
-				+ ", switchPorts=" + switchPorts + ", serverIp=" + serverIp
+				+  ", serverIp=" + serverIp
 				+ ", serverMac=" + serverMac + ", network=" + network
 				+ ", mask=" + mask + ", commandPriority=" + commandPriority
 				+ ", idleTimeout=" + idleTimeout + ", hardTimeout="

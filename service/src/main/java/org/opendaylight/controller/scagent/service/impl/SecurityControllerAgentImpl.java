@@ -44,13 +44,11 @@ import org.opendaylight.controller.sal.packet.TCP;
 import org.opendaylight.controller.sal.routing.IRouting;
 import org.opendaylight.controller.sal.utils.ServiceHelper;
 import org.opendaylight.controller.sal.utils.Status;
-import org.opendaylight.controller.scagent.northbound.utils.BYODRedirectCommand;
-import org.opendaylight.controller.scagent.northbound.utils.Cypher;
-import org.opendaylight.controller.scagent.northbound.utils.PolicyActionType;
-import org.opendaylight.controller.scagent.northbound.utils.PolicyCommand;
+import org.opendaylight.controller.scagent.northbound.utils.*;
 import org.opendaylight.controller.scagent.service.api.ISecurityControllerAgentService;
 import org.opendaylight.controller.switchmanager.ISwitchManager;
 import org.opendaylight.controller.topologymanager.ITopologyManager;
+import org.openflow.util.HexString;
 import org.osgi.framework.BundleActivator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,7 +60,7 @@ public class SecurityControllerAgentImpl extends ComponentActivatorAbstractBase
             .getLogger(ISecurityControllerAgentService.class);
     private ConsumerContext session;
     private IDataPacketService dataPacketService;
-    public Map<PolicyActionType, List<PolicyCommand>> policyCommands = new HashMap<PolicyActionType, List<PolicyCommand>>();
+    public Map<PolicyActionType, Map<String, PolicyCommand>> policyCommands = new HashMap<>();
 
     @Override
     public String sayHello(String args) {
@@ -138,8 +136,7 @@ public class SecurityControllerAgentImpl extends ComponentActivatorAbstractBase
                 IfIptoHost.class, this);
         IRouting routeService = (IRouting) ServiceHelper.getGlobalInstance(
                 IRouting.class, this);
-        logger.trace("Received data packet.");
-        if (policyCommands.get(PolicyActionType.BYOD_INIT).isEmpty()) {
+        if (policyCommands.get(PolicyActionType.BYOD_INIT) == null || policyCommands.get(PolicyActionType.BYOD_INIT).isEmpty()) {
             return PacketResult.IGNORED;
         }
         PacketResult result = PacketResult.IGNORED;
@@ -155,9 +152,8 @@ public class SecurityControllerAgentImpl extends ComponentActivatorAbstractBase
             return PacketResult.CONSUME;
 
         Ethernet ether = (Ethernet) l2pkt;
-        ;
-        for (PolicyCommand policyCommand : policyCommands
-                .get(PolicyActionType.BYOD_INIT)) {
+        logger.info("received a ether frame,mac source : {}", HexString.toHexString(ether.getSourceMACAddress()).toString());
+        for (PolicyCommand policyCommand : policyCommands.get(PolicyActionType.BYOD_INIT).values()) {
             BYODRedirectCommand initCommand = (BYODRedirectCommand) policyCommand;
             if ((long) (ingressNode.getID()) != initCommand.getDpid()) {
                 break;
@@ -166,19 +162,21 @@ public class SecurityControllerAgentImpl extends ComponentActivatorAbstractBase
                 break;
             }
 
-            boolean shouldBreak = false;
-            for (PolicyCommand byodAllow : policyCommands
-                    .get(PolicyActionType.BYOD_ALLOW)) {
-                if (Arrays.equals(ether.getSourceMACAddress(), byodAllow
-                        .getMatch().getDataLayerSource())) {
-                    // if MAC is authorized, leave it to other bundles like
-                    // routing service.
-                    shouldBreak = true;
-                    break;
+            if (policyCommands.get(PolicyActionType.BYOD_ALLOW) != null) {
+                boolean shouldBreak = false;
+                for (PolicyCommand byodAllow : policyCommands
+                        .get(PolicyActionType.BYOD_ALLOW).values()) {
+                    if (Arrays.equals(ether.getSourceMACAddress(), byodAllow
+                            .getMatch().getDataLayerSource())) {
+                        // if MAC is authorized, leave it to other bundles like
+                        // routing service.
+                        shouldBreak = true;
+                        break;
+                    }
                 }
+                if (shouldBreak)
+                    break;
             }
-            if (shouldBreak)
-                break;
             Object l3Pkt = l2pkt.getPayload();
             if (!(l3Pkt instanceof IPv4)) {
                 // maybe ARP packet, leave it to routing bundle
@@ -216,8 +214,7 @@ public class SecurityControllerAgentImpl extends ComponentActivatorAbstractBase
             // now it's an HTTP frame came from DPID&port&network specified in
             // policy, should redirect it
 
-            // first we should try to find the server's NodeConnector, if
-            // failure,
+            // first we should try to find the server's NodeConnector, if failure,
             // then no bother to go further
             HostNodeConnector serverNodeConnector = null;
             try {
@@ -245,7 +242,7 @@ public class SecurityControllerAgentImpl extends ComponentActivatorAbstractBase
             List<Edge> edges = route.getEdges();
             Match match = new Match();
             match.setField(MatchType.DL_SRC, ether.getSourceMACAddress());
-            match.setField(MatchType.NW_SRC, ipv4Pkt.getSourceAddress());
+            match.setField(MatchType.NW_SRC, intToInetAddress(ipv4Pkt.getSourceAddress()));
             match.setField(MatchType.TP_DST, tcpPkt.getDestinationPort());
             // (BYODRedirectCommand byodCommand, OFMatch match, NodePortTuple
             // previousAttachPoint, NodePortTuple nextAttachPoint, String
@@ -345,19 +342,29 @@ public class SecurityControllerAgentImpl extends ComponentActivatorAbstractBase
     }
 
     @Override
-    public Map<String, ? extends PolicyCommand> getAllPolicyCommands() {
+    public Map<PolicyActionType, Map<String, PolicyCommand>> getAllPolicyCommands() {
         // TODO Auto-generated method stub
-        return null;
+        return this.policyCommands;
     }
 
     @Override
-    public void addPolicyCommand(PolicyCommand policyCommand) {
-        policyCommands.get(policyCommand.getType()).add(policyCommand);
+    public PolicyCommand addPolicyCommand(PolicyCommand policyCommand) {
+        logger.info("adding a policy: {}", policyCommand.toString());
+        Map<String, PolicyCommand> policyCommands1 = policyCommands.get(policyCommand.getType());
+        if (policyCommands1 == null) {
+            policyCommands1 = new HashMap<>();
+            policyCommands.put(policyCommand.getType(), policyCommands1);
+            return policyCommands1.put(policyCommand.getId(), policyCommand);
+        } else if (policyCommands1.containsKey(policyCommand.getId())) {
+            return policyCommands1.get(policyCommand.getId());
+        } else {
+            return policyCommands1.put(policyCommand.getId(), policyCommand);
+        }
     }
 
     @Override
-    public PolicyCommand removePolicyCommand(String id) {
+    public PolicyCommand removePolicyCommand(PolicyActionType type, String id) {
         // TODO Auto-generated method stub
-        return null;
+        return policyCommands.get(type).remove(id);
     }
 }

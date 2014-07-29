@@ -25,7 +25,6 @@ import org.opendaylight.controller.sal.utils.HexEncode;
 import org.opendaylight.controller.sal.utils.ServiceHelper;
 import org.opendaylight.controller.sal.utils.Status;
 import org.opendaylight.controller.scagent.northbound.utils.*;
-import org.opendaylight.controller.scagent.northbound.utils.BYODInitConfig.SwitchPort;
 import org.opendaylight.controller.scagent.service.api.ISecurityControllerAgentService;
 import org.opendaylight.controller.switchmanager.ISwitchManager;
 import org.opendaylight.controller.topologymanager.ITopologyManager;
@@ -404,76 +403,74 @@ public class SCAgentNorthbound {
      */
     public List<PolicyCommand> generateBYODInitCommands(BYODInitConfig config) {
         ArrayList<PolicyCommand> initCommands = new ArrayList<PolicyCommand>();
-        for (SwitchPort switchPort : config.getSwitchPorts()) {
-            // priority=0 , inPort , controller
-            // PolicyCommand(String id, String policyName,
-            // int commandPriority, PolicyActionType type,
-            // MatchArguments match, List<SecurityDevice> devices,
-            // int idleTimeout, int hardTimeout, long dpid, short inPort);
-            PolicyCommand controllerAllCommand = new PolicyCommand("ByodInit_"
-                    + switchPort.getDpid() + ":" + switchPort.getInPort()
-                    + "0_" + config.getId(), "controllerAllCommand", 0,
-                    PolicyActionType.ALLOW_FLOW, new MatchArguments(), null, 0,
-                    0, switchPort.getDpid(), (short) 0);
-            initCommands.add(controllerAllCommand);
-            // priority=1 , inport , drop
-            MatchArguments inPortMatch = new MatchArguments();
-            inPortMatch.setInputPort(switchPort.getInPort());
-            PolicyCommand dropAllCommand = new PolicyCommand("ByodInit_"
-                    + switchPort.getDpid() + ":" + switchPort.getInPort()
-                    + "1_" + config.getId(), "dropAllCommand", 1,
-                    PolicyActionType.DROP_FLOW, inPortMatch, null, 0, 0,
-                    switchPort.getDpid(), switchPort.getInPort());
-            initCommands.add(dropAllCommand);
-            // allow arp, priorty = 2
-            MatchArguments allowArpMatch = new MatchArguments();
-            allowArpMatch.setDataLayerType((short) 0x0806);
-            allowArpMatch.setInputPort(switchPort.getInPort());
-            PolicyCommand allowArpCommand = new PolicyCommand("ByodInit_"
-                    + switchPort.getDpid() + ":" + switchPort.getInPort()
-                    + "2_" + config.getId(), "AllowArp", 2,
-                    PolicyActionType.ALLOW_FLOW, allowArpMatch, null, 0, 0,
-                    switchPort.getDpid(), switchPort.getInPort());
-            initCommands.add(allowArpCommand);
-            // allow dhcp, priorty = 2
-            MatchArguments allowDhcpMatch = new MatchArguments();
-            allowDhcpMatch.setDataLayerType((short) 0x0800);
-            allowDhcpMatch.setNetworkProtocol((byte) 0x11);
-            allowDhcpMatch.setTransportDestination((short) 67);
-            allowArpMatch.setInputPort(switchPort.getInPort());
-            PolicyCommand allowDhcpCommand = new PolicyCommand("ByodInit_"
-                    + switchPort.getDpid() + ":" + switchPort.getInPort()
-                    + "3_" + config.getId(), "AllowDHCP", 2,
-                    PolicyActionType.ALLOW_FLOW, allowDhcpMatch, null, 0, 0,
-                    switchPort.getDpid(), switchPort.getInPort());
-            initCommands.add(allowDhcpCommand);
+        // priority=0 , inPort , controller
+        // PolicyCommand(String id, String policyName,
+        // int commandPriority, PolicyActionType type,
+        // MatchArguments match, List<SecurityDevice> devices,
+        // int idleTimeout, int hardTimeout, long dpid, short inPort);
+        PolicyCommand controllerAllCommand = new PolicyCommand("ByodInit_"
+                + config.getDpid() + ":" + config.getInPort()
+                + "0_" + config.getId(), "controllerAllCommand", (short) 0,
+                PolicyActionType.ALLOW_FLOW, new MatchArguments(), null, (short) 0,
+                (short) 0, config.getDpid(), (short) 0);
+        initCommands.add(controllerAllCommand);
+        // priority=1 , inport , drop
+        MatchArguments inPortMatch = new MatchArguments();
+        inPortMatch.setInputPort(config.getInPort());
+        PolicyCommand dropAllCommand = new PolicyCommand("ByodInit_"
+                + config.getDpid() + ":" + config.getInPort()
+                + "1_" + config.getId(), "dropAllCommand", (short) 1,
+                PolicyActionType.DROP_FLOW, inPortMatch, null, (short) 0, (short) 0,
+                config.getDpid(), config.getInPort());
+        initCommands.add(dropAllCommand);
+        // allow arp, priorty = 2
+        MatchArguments allowArpMatch = new MatchArguments();
+        allowArpMatch.setDataLayerType((short) 0x0806);
+        allowArpMatch.setInputPort(config.getInPort());
+        PolicyCommand allowArpCommand = new PolicyCommand("ByodInit_"
+                + config.getDpid() + ":" + config.getInPort()
+                + "2_" + config.getId(), "AllowArp", (short) 2,
+                PolicyActionType.ALLOW_FLOW, allowArpMatch, null, (short) 0, (short) 0,
+                config.getDpid(), config.getInPort());
+        initCommands.add(allowArpCommand);
+        // allow dhcp, priorty = 2
+        MatchArguments allowDhcpMatch = new MatchArguments();
+        allowDhcpMatch.setDataLayerType((short) 0x0800);
+        allowDhcpMatch.setNetworkProtocol((byte) 0x11);
+        allowDhcpMatch.setTransportDestination((short) 67);
+        allowArpMatch.setInputPort(config.getInPort());
+        PolicyCommand allowDhcpCommand = new PolicyCommand("ByodInit_"
+                + config.getDpid() + ":" + config.getInPort()
+                + "3_" + config.getId(), "AllowDHCP", (short) 2,
+                PolicyActionType.ALLOW_FLOW, allowDhcpMatch, null, (short) 0, (short) 0,
+                config.getDpid(), config.getInPort());
+        initCommands.add(allowDhcpCommand);
 
-            // allow dns, priorty = 2
-            MatchArguments allowDnsMatch = new MatchArguments();
-            allowDnsMatch.setDataLayerType((short) 0x0800);
-            allowDnsMatch.setNetworkProtocol((byte) 0x11);
-            allowDnsMatch.setTransportDestination((short) 53);
-            allowArpMatch.setInputPort(switchPort.getInPort());
-            PolicyCommand allowDnsCommand = new PolicyCommand("ByodInit_"
-                    + switchPort.getDpid() + ":" + switchPort.getInPort()
-                    + "4_" + config.getId(), "AllowDns", 2,
-                    PolicyActionType.ALLOW_FLOW, allowDnsMatch, null, 0, 0,
-                    switchPort.getDpid(), switchPort.getInPort());
-            initCommands.add(allowDnsCommand);
+        // allow dns, priorty = 2
+        MatchArguments allowDnsMatch = new MatchArguments();
+        allowDnsMatch.setDataLayerType((short) 0x0800);
+        allowDnsMatch.setNetworkProtocol((byte) 0x11);
+        allowDnsMatch.setTransportDestination((short) 53);
+        allowArpMatch.setInputPort(config.getInPort());
+        PolicyCommand allowDnsCommand = new PolicyCommand("ByodInit_"
+                + config.getDpid() + ":" + config.getInPort()
+                + "4_" + config.getId(), "AllowDns", (short) 2,
+                PolicyActionType.ALLOW_FLOW, allowDnsMatch, null, (short) 0, (short) 0,
+                config.getDpid(), config.getInPort());
+        initCommands.add(allowDnsCommand);
 
-            // redirect tcp 80
-            MatchArguments httpMatch = new MatchArguments();
-            httpMatch.setDataLayerType((short) 0x0800);
-            httpMatch.setNetworkProtocol((byte) 0x6);
-            httpMatch.setTransportDestination((short) 80);
-            allowArpMatch.setInputPort(switchPort.getInPort());
-            PolicyCommand redirectHpptCommand = new PolicyCommand("ByodInit_"
-                    + switchPort.getDpid() + ":" + switchPort.getInPort()
-                    + "5_" + config.getId(), "redirectHttp", 2,
-                    PolicyActionType.ALLOW_FLOW, httpMatch, null, 0, 0,
-                    switchPort.getDpid(), switchPort.getInPort());
-            initCommands.add(redirectHpptCommand);
-        }
+        // redirect tcp 80
+        MatchArguments httpMatch = new MatchArguments();
+        httpMatch.setDataLayerType((short) 0x0800);
+        httpMatch.setNetworkProtocol((byte) 0x6);
+        httpMatch.setTransportDestination((short) 80);
+        allowArpMatch.setInputPort(config.getInPort());
+        PolicyCommand redirectHpptCommand = new PolicyCommand("ByodInit_"
+                + config.getDpid() + ":" + config.getInPort()
+                + "5_" + config.getId(), "redirectHttp", (short) 2,
+                PolicyActionType.ALLOW_FLOW, httpMatch, null, (short) 0, (short) 0,
+                config.getDpid(), config.getInPort());
+        initCommands.add(redirectHpptCommand);
         return initCommands;
     }
 }
