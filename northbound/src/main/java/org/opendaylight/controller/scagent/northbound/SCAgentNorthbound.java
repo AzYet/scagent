@@ -43,6 +43,7 @@ import java.util.*;
 import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonFactory;
+import com.google.gson.Gson;
 
 @Path("/")
 public class SCAgentNorthbound {
@@ -62,7 +63,7 @@ public class SCAgentNorthbound {
     // <FlowModId,SwitchFlowModCount>
     static Map<String, SwitchFlowModCount> globalFlowModCountMap = new HashMap<String, SwitchFlowModCount>();
 
-    @Path("/scagent/{param}")
+    /*@Path("/scagent/{param}")
     @GET
     @Produces({MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML})
     @TypeHint(FindHostsResult.class)
@@ -197,9 +198,74 @@ public class SCAgentNorthbound {
         // return Response.ok(new String(param + " - something went wrong!"))
         // .status(503).build();
         return new FindHostsResult("none", (short) 0);
+    }*/
+
+    @Path("/scagent/policyaction/{type}/{id}")
+    @GET
+    @Produces({MediaType.APPLICATION_JSON})
+    @StatusCodes({@ResponseCode(code = 200, condition = "operational"),
+            @ResponseCode(code = 503, condition = "Internal error"),
+            @ResponseCode(code = 503, condition = "misfunctional")})
+    public Response getPolicyByTypeAndId(
+            @PathParam(value = "type") String type, @PathParam(value = "id") String id) {
+        logger.info("request to list policy type = {}, id = {}", type, id);
+        ISecurityControllerAgentService scAgentService = (ISecurityControllerAgentService) ServiceHelper
+                .getGlobalInstance(ISecurityControllerAgentService.class, this);
+        Map<PolicyActionType, Map<String, PolicyCommand>> allPolicyCommands = scAgentService.getAllPolicyCommands();
+        PolicyActionType pa;
+        try {
+            pa = PolicyActionType.valueOf(type.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            logger.error("type error: {}, no such policy type", type);
+            return Response.ok(String.format("{\"status\" : \"error\", \"result\" : \"%s\"}", "no such policy type")).status(503).build();
+        }
+        Map<String, PolicyCommand> typePolicies = allPolicyCommands.get(pa);
+        Gson gson = new Gson();
+        if(id == null){
+            return Response.ok(String.format(
+                    "{\"status\" : \"ok\", \"result\" : %s}", gson.toJson(typePolicies))).status(200).build();
+        }
+        PolicyCommand policyCommand = typePolicies.get(id);
+        if(policyCommand != null) {
+            return Response.ok(String.format(
+                    "{\"status\" : \"ok\", \"result\" : %s}", gson.toJson(policyCommand))).status(200).build();
+        }else {
+            return Response.ok(String.format(
+                    "{\"status\" : \"ok\", \"result\" : %s}", "null")).status(200).build();
+        }
     }
 
-    @Path("/scagent/policyaction/{format}")
+    @Path("/scagent/policyaction/{type}")
+    @GET
+    @Produces({MediaType.APPLICATION_JSON})
+    @StatusCodes({@ResponseCode(code = 200, condition = "operational"),
+            @ResponseCode(code = 503, condition = "Internal error"),
+            @ResponseCode(code = 503, condition = "misfunctional")})
+    public Response getPoliciesByType(
+            @PathParam(value = "type") String type) {
+        logger.info("request to list policy type = {}", type);
+        ISecurityControllerAgentService scAgentService = (ISecurityControllerAgentService) ServiceHelper
+                .getGlobalInstance(ISecurityControllerAgentService.class, this);
+        Map<PolicyActionType, Map<String, PolicyCommand>> allPolicyCommands = scAgentService.getAllPolicyCommands();
+        PolicyActionType pa;
+        try {
+            pa = PolicyActionType.valueOf(type.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            logger.error("type error: {}, no such policy type", type);
+            return Response.ok(String.format("{\"status\" : \"error\", \"result\" : \"%s\"}", "no such policy type")).status(503).build();
+        }
+        Map<String, PolicyCommand> typePolicies = allPolicyCommands.get(pa);
+        if(typePolicies != null){
+            Gson gson = new Gson();
+            return Response.ok(String.format(
+                    "{\"status\" : \"ok\", \"result\" : %s}", gson.toJson(typePolicies.values()))).status(200).build();
+        }else{
+            return Response.ok(String.format(
+                    "{\"status\" : \"ok\", \"result\" : %s}", "[]")).status(200).build();
+        }
+    }
+
+    /*@Path("/scagent/policyaction/{format}")
     @POST
     @Consumes({MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML})
     @TypeHint(InputHost.class)
@@ -253,9 +319,9 @@ public class SCAgentNorthbound {
         }
 
         return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
-    }
+    }*/
 
-    @Path("/scagent/policyaction/BYOD_INIT/{id}")
+    @Path("/scagent/policyaction/{type}/{id}")
     @POST
     @Consumes({MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML})
     @Produces({MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML})
@@ -263,41 +329,54 @@ public class SCAgentNorthbound {
     @StatusCodes({@ResponseCode(code = 200, condition = "operational"),
             @ResponseCode(code = 503, condition = "Internal error"),
             @ResponseCode(code = 503, condition = "misfunctional")})
-    public Response createByodInit(@PathParam(value = "id") String param,
+    public Response createByodInit(@PathParam(value = "type") String type,@PathParam(value = "id") String param,
                                    @TypeHint(BYODInitConfig.class) BYODInitConfig config) {
 
-        logger.info("received BYOD_INIT command = {}", config.toString());
-        List<PolicyCommand> initCommands = generateBYODInitCommands(config);
-        HashMap<String, String> resMap = new HashMap<>();
-        boolean error = false;
-        for (PolicyCommand p : initCommands) {
-            String s = processSingleFlowCommand(p);
-            if (s == "error") {
-                error = true;
-            }
-            resMap.put(p.getPolicyName(), s);
+        logger.info("received {} command = {}",type, config.toString());
+        ISecurityControllerAgentService scAgentService = (ISecurityControllerAgentService) ServiceHelper
+                .getGlobalInstance(ISecurityControllerAgentService.class, this);
+        if(scAgentService == null){
+            return Response.ok(String.format(
+                    "{\"status\" : \"error\", \"result\" : \"%s\"}", "cannot get scAgentService")).status(200).build();
         }
-        JsonFactory factory = new JsonFactory();
-        StringWriter writer = new StringWriter();
-        String res;
-        try {
-            JsonGenerator generator = factory.createGenerator(writer);
-            generator.writeStartObject();
-            generator.writeStringField("status", error ? "error" : "ok");
-            generator.writeArrayFieldStart("result");
-            for (Map.Entry<String, String> name : resMap.entrySet()) {
-                generator.writeStartObject();
-                generator.writeStringField(name.getKey(), name.getValue());
-                generator.writeEndObject();
+        PolicyCommand resCommand = scAgentService.addPolicyCommand(config.toByodRedirectCommand());
+        if(resCommand != null){
+            return Response.ok(String.format(
+                    "{\"status\" : \"error\", \"result\" : \"%s\"}", "policy already exists.")).status(200).build();
+        }
+        String res = null;
+        if(PolicyActionType.valueOf(type.toUpperCase()) == PolicyActionType.BYOD_INIT){
+            List<PolicyCommand> initCommands = generateBYODInitCommands(config);
+            HashMap<String, String> resMap = new HashMap<>();
+            boolean error = false;
+            for (PolicyCommand p : initCommands) {
+                String s = processSingleFlowCommand(p);
+                if (s == "error") {
+                    error = true;
+                }
+                resMap.put(p.getPolicyName(), s);
             }
-            generator.writeEndArray();
-            generator.writeEndObject();
-            generator.close();
-            res = writer.toString();
-            logger.info(res);
-        } catch (IOException e) {
-            res = "{\"status\" : \"error\", \"result\" : [\"json conversion failed. \"]}";
-            e.printStackTrace();
+            JsonFactory factory = new JsonFactory();
+            StringWriter writer = new StringWriter();
+            try {
+                JsonGenerator generator = factory.createGenerator(writer);
+                generator.writeStartObject();
+                generator.writeStringField("status", error ? "error" : "ok");
+                generator.writeArrayFieldStart("result");
+                for (Map.Entry<String, String> name : resMap.entrySet()) {
+                    generator.writeStartObject();
+                    generator.writeStringField(name.getKey(), name.getValue());
+                    generator.writeEndObject();
+                }
+                generator.writeEndArray();
+                generator.writeEndObject();
+                generator.close();
+                res = writer.toString();
+                logger.info(res);
+            } catch (IOException e) {
+                res = "{\"status\" : \"error\", \"result\" : [\"json conversion failed. \"]}";
+                e.printStackTrace();
+            }
         }
         return Response.ok(new String(res)).status(Response.Status.OK).build();
 
@@ -403,74 +482,74 @@ public class SCAgentNorthbound {
      */
     public List<PolicyCommand> generateBYODInitCommands(BYODInitConfig config) {
         ArrayList<PolicyCommand> initCommands = new ArrayList<PolicyCommand>();
-        // priority=0 , inPort , controller
-        // PolicyCommand(String id, String policyName,
-        // int commandPriority, PolicyActionType type,
-        // MatchArguments match, List<SecurityDevice> devices,
-        // int idleTimeout, int hardTimeout, long dpid, short inPort);
-        PolicyCommand controllerAllCommand = new PolicyCommand("ByodInit_"
-                + config.getDpid() + ":" + config.getInPort()
-                + "0_" + config.getId(), "controllerAllCommand", (short) 0,
-                PolicyActionType.ALLOW_FLOW, new MatchArguments(), null, (short) 0,
-                (short) 0, config.getDpid(), (short) 0);
-        initCommands.add(controllerAllCommand);
-        // priority=1 , inport , drop
-        MatchArguments inPortMatch = new MatchArguments();
-        inPortMatch.setInputPort(config.getInPort());
-        PolicyCommand dropAllCommand = new PolicyCommand("ByodInit_"
-                + config.getDpid() + ":" + config.getInPort()
-                + "1_" + config.getId(), "dropAllCommand", (short) 1,
-                PolicyActionType.DROP_FLOW, inPortMatch, null, (short) 0, (short) 0,
-                config.getDpid(), config.getInPort());
-        initCommands.add(dropAllCommand);
-        // allow arp, priorty = 2
-        MatchArguments allowArpMatch = new MatchArguments();
-        allowArpMatch.setDataLayerType((short) 0x0806);
-        allowArpMatch.setInputPort(config.getInPort());
-        PolicyCommand allowArpCommand = new PolicyCommand("ByodInit_"
-                + config.getDpid() + ":" + config.getInPort()
-                + "2_" + config.getId(), "AllowArp", (short) 2,
-                PolicyActionType.ALLOW_FLOW, allowArpMatch, null, (short) 0, (short) 0,
-                config.getDpid(), config.getInPort());
-        initCommands.add(allowArpCommand);
-        // allow dhcp, priorty = 2
-        MatchArguments allowDhcpMatch = new MatchArguments();
-        allowDhcpMatch.setDataLayerType((short) 0x0800);
-        allowDhcpMatch.setNetworkProtocol((byte) 0x11);
-        allowDhcpMatch.setTransportDestination((short) 67);
-        allowArpMatch.setInputPort(config.getInPort());
-        PolicyCommand allowDhcpCommand = new PolicyCommand("ByodInit_"
-                + config.getDpid() + ":" + config.getInPort()
-                + "3_" + config.getId(), "AllowDHCP", (short) 2,
-                PolicyActionType.ALLOW_FLOW, allowDhcpMatch, null, (short) 0, (short) 0,
-                config.getDpid(), config.getInPort());
-        initCommands.add(allowDhcpCommand);
+            // priority=0 , inPort , controller
+            // PolicyCommand(String id, String policyName,
+            // int commandPriority, PolicyActionType type,
+            // MatchArguments match, List<SecurityDevice> devices,
+            // int idleTimeout, int hardTimeout, long dpid, short inPort);
+            PolicyCommand controllerAllCommand = new PolicyCommand("ByodInit_"
+                    + config.getDpid() + ":" + config.getInPort()
+                    + "0_" + config.getId(), "controllerAllCommand", (short)0,
+                    PolicyActionType.ALLOW_FLOW, new MatchArguments(), null, (short)0,
+                    (short)0, config.getDpid(), (short) 0);
+            initCommands.add(controllerAllCommand);
+            // priority=1 , inport , drop
+            MatchArguments inPortMatch = new MatchArguments();
+            inPortMatch.setInputPort(config.getInPort());
+            PolicyCommand dropAllCommand = new PolicyCommand("ByodInit_"
+                    + config.getDpid() + ":" + config.getInPort()
+                    + "1_" + config.getId(), "dropAllCommand", (short)1,
+                    PolicyActionType.DROP_FLOW, inPortMatch, null, (short)0, (short)0,
+                    config.getDpid(), config.getInPort());
+            initCommands.add(dropAllCommand);
+            // allow arp, priorty = 2
+            MatchArguments allowArpMatch = new MatchArguments();
+            allowArpMatch.setDataLayerType((short) 0x0806);
+            allowArpMatch.setInputPort(config.getInPort());
+            PolicyCommand allowArpCommand = new PolicyCommand("ByodInit_"
+                    + config.getDpid() + ":" + config.getInPort()
+                    + "2_" + config.getId(), "AllowArp", (short)2,
+                    PolicyActionType.ALLOW_FLOW, allowArpMatch, null, (short)0,(short) 0,
+                    config.getDpid(), config.getInPort());
+            initCommands.add(allowArpCommand);
+            // allow dhcp, priorty = 2
+            MatchArguments allowDhcpMatch = new MatchArguments();
+            allowDhcpMatch.setDataLayerType((short) 0x0800);
+            allowDhcpMatch.setNetworkProtocol((byte) 0x11);
+            allowDhcpMatch.setTransportDestination((short) 67);
+            allowArpMatch.setInputPort(config.getInPort());
+            PolicyCommand allowDhcpCommand = new PolicyCommand("ByodInit_"
+                    + config.getDpid() + ":" + config.getInPort()
+                    + "3_" + config.getId(), "AllowDHCP", (short)2,
+                    PolicyActionType.ALLOW_FLOW, allowDhcpMatch, null, (short)0,(short) 0,
+                    config.getDpid(), config.getInPort());
+            initCommands.add(allowDhcpCommand);
 
-        // allow dns, priorty = 2
-        MatchArguments allowDnsMatch = new MatchArguments();
-        allowDnsMatch.setDataLayerType((short) 0x0800);
-        allowDnsMatch.setNetworkProtocol((byte) 0x11);
-        allowDnsMatch.setTransportDestination((short) 53);
-        allowArpMatch.setInputPort(config.getInPort());
-        PolicyCommand allowDnsCommand = new PolicyCommand("ByodInit_"
-                + config.getDpid() + ":" + config.getInPort()
-                + "4_" + config.getId(), "AllowDns", (short) 2,
-                PolicyActionType.ALLOW_FLOW, allowDnsMatch, null, (short) 0, (short) 0,
-                config.getDpid(), config.getInPort());
-        initCommands.add(allowDnsCommand);
+            // allow dns, priorty = 2
+            MatchArguments allowDnsMatch = new MatchArguments();
+            allowDnsMatch.setDataLayerType((short) 0x0800);
+            allowDnsMatch.setNetworkProtocol((byte) 0x11);
+            allowDnsMatch.setTransportDestination((short) 53);
+            allowArpMatch.setInputPort(config.getInPort());
+            PolicyCommand allowDnsCommand = new PolicyCommand("ByodInit_"
+                    + config.getDpid() + ":" + config.getInPort()
+                    + "4_" + config.getId(), "AllowDns", (short)2,
+                    PolicyActionType.ALLOW_FLOW, allowDnsMatch, null, (short)0, (short)0,
+                    config.getDpid(), config.getInPort());
+            initCommands.add(allowDnsCommand);
 
-        // redirect tcp 80
-        MatchArguments httpMatch = new MatchArguments();
-        httpMatch.setDataLayerType((short) 0x0800);
-        httpMatch.setNetworkProtocol((byte) 0x6);
-        httpMatch.setTransportDestination((short) 80);
-        allowArpMatch.setInputPort(config.getInPort());
-        PolicyCommand redirectHpptCommand = new PolicyCommand("ByodInit_"
-                + config.getDpid() + ":" + config.getInPort()
-                + "5_" + config.getId(), "redirectHttp", (short) 2,
-                PolicyActionType.ALLOW_FLOW, httpMatch, null, (short) 0, (short) 0,
-                config.getDpid(), config.getInPort());
-        initCommands.add(redirectHpptCommand);
+            // redirect tcp 80
+            MatchArguments httpMatch = new MatchArguments();
+            httpMatch.setDataLayerType((short) 0x0800);
+            httpMatch.setNetworkProtocol((byte) 0x6);
+            httpMatch.setTransportDestination((short) 80);
+            allowArpMatch.setInputPort(config.getInPort());
+            PolicyCommand redirectHpptCommand = new PolicyCommand("ByodInit_"
+                    + config.getDpid() + ":" + config.getInPort()
+                    + "5_" + config.getId(), "redirectHttp", (short)2,
+                    PolicyActionType.ALLOW_FLOW, httpMatch, null, (short)0,(short) 0,
+                    config.getDpid(), config.getInPort());
+            initCommands.add(redirectHpptCommand);
         return initCommands;
     }
 }

@@ -5,7 +5,7 @@
 		<rest defaultRestSubcontext="/controller/nb/v2/scagent" />
 	</services>
 	<modules>
-		<docs docsDir="rest" title="scAgent REST API" includeExampleXml="true"
+		<docs docsDir="rest" title="Ping REST API" includeExampleXml="true"
 			includeExampleJson="true" />
 	</modules>
 </enunciate>

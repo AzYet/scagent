@@ -22,14 +22,7 @@ public class BYODInitConfig {
 	private short idleTimeout;
 	private short hardTimeout;
 
-    public BYODRedirectCommand toByodRedirectCommand(){
-        BYODRedirectCommand byodRedirectCommand = new BYODRedirectCommand(
-                id,commandName,commandPriority,type,null,null,idleTimeout,hardTimeout,dpid,
-                inPort,network,mask,serverIp,serverMac);
-    return byodRedirectCommand;
-    }
-
-	public BYODInitConfig() {
+    public BYODInitConfig() {
 		super();
 	}
 
@@ -128,6 +121,12 @@ public class BYODInitConfig {
 
     public void setInPort(short inPort) {
         this.inPort = inPort;
+    }
+
+    public BYODRedirectCommand toByodRedirectCommand(){
+        return new BYODRedirectCommand(
+                id,commandName,commandPriority,type,null,null,
+                idleTimeout,hardTimeout,dpid,inPort,network,mask,serverIp,serverMac);
     }
 
     @Override

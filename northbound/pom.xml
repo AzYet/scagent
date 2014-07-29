@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-  <modelVersion>4.0.0</modelVersion>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
     <properties>
         <maven-bundle-plugin.Import-Package>
             org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924,
@@ -29,6 +30,7 @@
             javax.xml.bind,
             org.slf4j,
             org.apache.catalina.filters,
+            com.google.gson,
             com.fasterxml.jackson.jaxrs.base,
             com.fasterxml.jackson.core,
             com.fasterxml.jackson.jaxrs.json,
@@ -36,133 +38,118 @@
         </maven-bundle-plugin.Import-Package>
     </properties>
     <parent>
-    <groupId>org.opendaylight.controller</groupId>
-    <artifactId>commons.opendaylight</artifactId>
-    <version>1.4.2-SNAPSHOT</version>
-    <relativePath>../../commons/opendaylight</relativePath>
-  </parent>
-  <artifactId>scagent.northbound</artifactId>
-  <version>1.0-SNAPSHOT</version>
-  <packaging>bundle</packaging>
+        <groupId>org.opendaylight.controller</groupId>
+        <artifactId>commons.opendaylight</artifactId>
+        <version>1.4.2-SNAPSHOT</version>
+        <relativePath>../../commons/opendaylight</relativePath>
+    </parent>
+    <artifactId>scagent.northbound</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <packaging>bundle</packaging>
+    <dependencies>
 
+        <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+            <version>2.2.4</version>
+        </dependency>
 
-  <dependencies>
+        <dependency>
+            <groupId>org.codehaus.enunciate</groupId>
+            <artifactId>enunciate-core-annotations</artifactId>
+            <version>${enunciate.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.opendaylight.controller</groupId>
+            <artifactId>commons.northbound</artifactId>
+            <version>0.4.2-SNAPSHOT</version>
+        </dependency>
 
-    <dependency>
-      <groupId>org.codehaus.enunciate</groupId>
-      <artifactId>enunciate-core-annotations</artifactId>
-      <version>${enunciate.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.opendaylight.controller</groupId>
-      <artifactId>commons.northbound</artifactId>
-      <version>0.4.2-SNAPSHOT</version>
-    </dependency>
+        <dependency>
+            <groupId>org.opendaylight.controller</groupId>
+            <artifactId>hosttracker</artifactId>
+            <version>0.5.2-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>org.opendaylight.controller</groupId>
+            <artifactId>sal</artifactId>
+            <version>0.7.1-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>org.opendaylight.controller</groupId>
+            <artifactId>scagent.service</artifactId>
+            <version>1.0-SNAPSHOT</version>
+        </dependency>
 
-    <dependency>
-      <groupId>org.opendaylight.controller</groupId>
-      <artifactId>hosttracker</artifactId>
-      <version>0.5.2-SNAPSHOT</version>
-    </dependency>
-    <dependency>
-      <groupId>org.opendaylight.controller</groupId>
-      <artifactId>sal</artifactId>
-      <version>0.7.1-SNAPSHOT</version>
-    </dependency>
-    <dependency>
-      <groupId>org.opendaylight.controller</groupId>
-      <artifactId>scagent.service</artifactId>
-      <version>1.0-SNAPSHOT</version>
-    </dependency>
+        <dependency>
+            <groupId>org.opendaylight.controller</groupId>
+            <artifactId>switchmanager</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.opendaylight.controller</groupId>
+            <artifactId>topologymanager</artifactId>
+        </dependency>
 
-    <dependency>
-      <groupId>org.opendaylight.controller</groupId>
-      <artifactId>switchmanager</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.opendaylight.controller</groupId>
-      <artifactId>topologymanager</artifactId>
-    </dependency>
+        <dependency>
+            <groupId>org.opendaylight.controller.thirdparty</groupId>
+            <artifactId>com.sun.jersey.jersey-servlet</artifactId>
+            <version>1.17</version>
+        </dependency>
+        <dependency>
+            <groupId>org.opendaylight.controller.thirdparty</groupId>
+            <artifactId>org.apache.catalina.filters.CorsFilter</artifactId>
+            <version>7.0.42</version>
+        </dependency>
 
-    <dependency>
-      <groupId>org.opendaylight.controller.thirdparty</groupId>
-      <artifactId>com.sun.jersey.jersey-servlet</artifactId>
-      <version>1.17</version>
-    </dependency>
-    <dependency>
-      <groupId>org.opendaylight.controller.thirdparty</groupId>
-      <artifactId>org.apache.catalina.filters.CorsFilter</artifactId>
-      <version>7.0.42</version>
-    </dependency>
+        <dependency>
+            <groupId>org.opendaylight.controller.thirdparty</groupId>
+            <artifactId>org.openflow.openflowj</artifactId>
+        </dependency>
 
-    <dependency>
-      <groupId>org.opendaylight.controller.thirdparty</groupId>
-      <artifactId>org.openflow.openflowj</artifactId>
-    </dependency>
+    </dependencies>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.felix</groupId>
+                <artifactId>maven-bundle-plugin</artifactId>
+                <version>${bundle.plugin.version}</version>
+                <extensions>true</extensions>
+                <configuration>
+                    <instructions>
+                        <Import-Package>${maven-bundle-plugin.Import-Package}</Import-Package>
+                        <Export-Package>org.opendaylight.controller.scagent.northbound.utils</Export-Package>
+                        <Embed-Dependency>org.openflow.openflowj</Embed-Dependency>
 
-  </dependencies>
-  <build>
-    <plugins>
-      <plugin>
-        <groupId>org.apache.felix</groupId>
-        <artifactId>maven-bundle-plugin</artifactId>
-        <version>${bundle.plugin.version}</version>
-        <extensions>true</extensions>
-        <configuration>
-          <instructions>
-            <Import-Package>${maven-bundle-plugin.Import-Package}</Import-Package>
-            <Export-Package>org.opendaylight.controller.scagent.northbound.utils</Export-Package>
-            <Embed-Dependency>org.openflow.openflowj</Embed-Dependency>
-
-            <Web-ContextPath>/controller/nb/v2</Web-ContextPath>
-          </instructions>
-          <manifestLocation>${project.basedir}/src/main/resources/META-INF</manifestLocation>
-        </configuration>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-checkstyle-plugin</artifactId>
-        <version>2.10</version>
-        <configuration>
-          <suppressionsLocation>${basedir}/checkstyle-suppressions.xml</suppressionsLocation>
-        </configuration>
-        <executions>
-          <execution>
-            <id>checkstyle</id>
-            <goals>
-              <goal>check</goal>
-            </goals>
-            <phase>validate</phase>
-            <configuration>
-              <failOnViolation>true</failOnViolation>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
-        <groupId>org.codehaus.enunciate</groupId>
-        <artifactId>maven-enunciate-plugin</artifactId>
-        <version>${enunciate.version}</version>
-      </plugin>
-      <plugin>
-
-        <groupId>org.apache.maven.plugins</groupId>
-
-        <artifactId>maven-compiler-plugin</artifactId>
-
-        <version>2.5.1</version>
-
-        <inherited>true</inherited>
-
-        <configuration>
-
-          <source>1.8</source>
-
-          <target>1.8</target>
-
-        </configuration>
-
-      </plugin>
-    </plugins>
-  </build>
+                        <Web-ContextPath>/controller/nb/v2</Web-ContextPath>
+                    </instructions>
+                    <manifestLocation>${project.basedir}/src/main/resources/META-INF</manifestLocation>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-checkstyle-plugin</artifactId>
+                <version>2.10</version>
+                <configuration>
+                    <suppressionsLocation>${basedir}/checkstyle-suppressions.xml</suppressionsLocation>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>checkstyle</id>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <phase>validate</phase>
+                        <configuration>
+                            <failOnViolation>true</failOnViolation>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.enunciate</groupId>
+                <artifactId>maven-enunciate-plugin</artifactId>
+                <version>${enunciate.version}</version>
+            </plugin>
+        </plugins>
+    </build>
 </project>

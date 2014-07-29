@@ -15,5 +15,15 @@ public enum PolicyActionType {
     BLOCK_VM,
     // adjust reputation
     ADJUST_REPUTATION,
-    UNKNOWN, RESTORE_DROP_FLOW, RESTORE_BYOD_INIT,
+    UNKNOWN, RESTORE_DROP_FLOW, RESTORE_BYOD_INIT;
+    public static void main(String [] args){
+        try {
+            PolicyActionType pa = PolicyActionType.valueOf("rediraect_flow".toUpperCase());
+        }catch(IllegalArgumentException e){
+            System.out.println("type error");
+        }
+//        System.out.println(pa);
+
+    }
+
 }

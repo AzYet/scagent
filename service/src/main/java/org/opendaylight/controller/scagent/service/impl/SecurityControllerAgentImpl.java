@@ -350,15 +350,15 @@ public class SecurityControllerAgentImpl extends ComponentActivatorAbstractBase
     @Override
     public PolicyCommand addPolicyCommand(PolicyCommand policyCommand) {
         logger.info("adding a policy: {}", policyCommand.toString());
-        Map<String, PolicyCommand> policyCommands1 = policyCommands.get(policyCommand.getType());
-        if (policyCommands1 == null) {
-            policyCommands1 = new HashMap<>();
-            policyCommands.put(policyCommand.getType(), policyCommands1);
-            return policyCommands1.put(policyCommand.getId(), policyCommand);
-        } else if (policyCommands1.containsKey(policyCommand.getId())) {
-            return policyCommands1.get(policyCommand.getId());
+        Map<String, PolicyCommand> perTypePolicyCommands = policyCommands.get(policyCommand.getType());
+        if (perTypePolicyCommands == null) {
+            perTypePolicyCommands = new HashMap<>();
+            policyCommands.put(policyCommand.getType(), perTypePolicyCommands);
+            return perTypePolicyCommands.put(policyCommand.getId(), policyCommand);
+        } else if (perTypePolicyCommands.containsKey(policyCommand.getId())) {
+            return perTypePolicyCommands.get(policyCommand.getId());
         } else {
-            return policyCommands1.put(policyCommand.getId(), policyCommand);
+            return perTypePolicyCommands.put(policyCommand.getId(), policyCommand);
         }
     }
 

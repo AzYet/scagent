@@ -18,7 +18,7 @@ public class PolicyCommand  implements Comparable<PolicyCommand>{
 	protected short inPort;
 
 	public PolicyCommand(String policyCommandId, String policyName,
-			short commandPriority, PolicyActionType type, MatchArguments match,
+                         short commandPriority, PolicyActionType type, MatchArguments match,
 			List<SecurityDevice> devices) {
 		super();
 		this.id = policyCommandId;
@@ -224,21 +224,6 @@ public class PolicyCommand  implements Comparable<PolicyCommand>{
 		this.hardTimeout = hardTimeout;
 	}
 
-    public short getInPort() {
-        return inPort;
-    }
-
-    public void setInPort(short inPort) {
-        this.inPort = inPort;
-    }
-
-    public long getDpid() {
-        return dpid;
-    }
-
-    public void setDpid(long swIPAddress) {
-        this.dpid = swIPAddress;
-    }
 
 	@Override
 	public String toString() {
@@ -254,4 +239,19 @@ public class PolicyCommand  implements Comparable<PolicyCommand>{
 		return commandPriority == o.commandPriority ? 0 :(commandPriority > o.commandPriority ? 1 : -1);
 	}
 
+	public short getInPort() {
+		return inPort;
+	}
+
+	public void setInPort(short inPort) {
+		this.inPort = inPort;
+	}
+
+	public long getDpid() {
+		return dpid;
+	}
+
+	public void setDpid(long swIPAddress) {
+		this.dpid = swIPAddress;
+	}
 }
