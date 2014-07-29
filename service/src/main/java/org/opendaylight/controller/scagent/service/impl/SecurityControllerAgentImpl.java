@@ -48,6 +48,7 @@ import org.opendaylight.controller.scagent.northbound.utils.*;
 import org.opendaylight.controller.scagent.service.api.ISecurityControllerAgentService;
 import org.opendaylight.controller.switchmanager.ISwitchManager;
 import org.opendaylight.controller.topologymanager.ITopologyManager;
+import org.openflow.protocol.OFMatch;
 import org.openflow.util.HexString;
 import org.osgi.framework.BundleActivator;
 import org.slf4j.Logger;
@@ -184,9 +185,13 @@ public class SecurityControllerAgentImpl extends ComponentActivatorAbstractBase
             }
             IPv4 ipv4Pkt = (IPv4) l3Pkt;
             int initNetwork = 0;
+            int serverIp = 0;
             try {
                 initNetwork = ByteBuffer.wrap(
                         InetAddress.getByName(initCommand.getNetwork())
+                                .getAddress()).getInt();
+                serverIp = ByteBuffer.wrap(
+                        InetAddress.getByName(initCommand.getServerIp())
                                 .getAddress()).getInt();
             } catch (UnknownHostException e) {
                 // TODO Auto-generated catch block
@@ -242,30 +247,73 @@ public class SecurityControllerAgentImpl extends ComponentActivatorAbstractBase
             List<Edge> edges = route.getEdges();
             Match match = new Match();
             match.setField(MatchType.DL_SRC, ether.getSourceMACAddress());
+            //TODO: replace 0x0800 to final
+            match.setField(MatchType.DL_TYPE, (short) 0x0800);
             match.setField(MatchType.NW_SRC, intToInetAddress(ipv4Pkt.getSourceAddress()));
+            match.setField(MatchType.NW_PROTO, (byte) 0x6);
             match.setField(MatchType.TP_DST, tcpPkt.getDestinationPort());
             // (BYODRedirectCommand byodCommand, OFMatch match, NodePortTuple
             // previousAttachPoint, NodePortTuple nextAttachPoint, String
             // action, int ip, byte[] mac, byte[] devMac)
             String flowId = null;
             for (int i = 0; i < edges.size(); i++) {
+                logger.info("Redirect from device to Server, No. {}",i);
                 if (i == 0) {
                     flowId = pushFlowSingleEntry(initCommand, match,
                             ingressConnector, edges.get(i)
                                     .getTailNodeConnector(), "none", 0, null,
-                            null, (short) 0, (short) 5);
+                            null, (short) 0, (short) 500);
                 } else if (i == edges.size() - 1) {
                     flowId = pushFlowSingleEntry(initCommand, match,
+                            edges.get(i - 1).getHeadNodeConnector(),
+                            edges.get(i).getTailNodeConnector(), "none", 0,
+                            null, null, (short) 0, (short) 500);
+                    flowId = pushFlowSingleEntry(initCommand, match,
                             edges.get(i).getHeadNodeConnector(),
-                            serverNodeConnector.getnodeConnector(), "none", 0,
-                            null, null, (short) 0, (short) 5);
+                            serverNodeConnector.getnodeConnector(), "dst", serverIp,
+                            HexString.fromHexString(initCommand.getServerMac()), null, (short) 0, (short) 500);
                 } else {
                     flowId = pushFlowSingleEntry(initCommand, match,
                             edges.get(i - 1).getHeadNodeConnector(),
                             edges.get(i).getTailNodeConnector(), "none", 0,
-                            null, null, (short) 0, (short) 5);
+                            null, null, (short) 0, (short) 500);
                 }
-
+            }
+            //set up the returning flows
+            Match mt = new Match();
+            mt.setField(MatchType.DL_SRC, HexString.fromHexString(initCommand.getServerMac()));
+            //TODO: replace 0x0800 to final
+            mt.setField(MatchType.DL_TYPE, (short) 0x0800);
+            mt.setField(MatchType.NW_SRC, intToInetAddress(ipv4Pkt.getDestinationAddress()));
+            mt.setField(MatchType.NW_DST, intToInetAddress(ipv4Pkt.getSourceAddress()));
+            mt.setField(MatchType.NW_PROTO, (byte) 0x6);
+            mt.setField(MatchType.TP_SRC, tcpPkt.getDestinationPort());
+            for (int i = edges.size() - 1; i >= 0; i--) {
+                logger.info("Redirect from Server to device, No. {}",i);
+                String flowId2;
+                if (i == 0) {
+                    flowId2 = pushFlowSingleEntry(initCommand, mt,
+                            edges.get(i+1).getTailNodeConnector(),
+                            edges.get(i).getHeadNodeConnector(),
+                            "none", 0,
+                            null, null, (short) 0, (short) 500);
+                    flowId2 = pushFlowSingleEntry(initCommand, mt,
+                            edges.get(i).getTailNodeConnector(), ingressConnector, "none", 0, null,
+                            null, (short) 0, (short) 500);
+                } else if (i == edges.size() - 1) {
+                    mt.setField(MatchType.NW_SRC, intToInetAddress(serverIp));
+                    flowId2 = pushFlowSingleEntry(initCommand, mt,
+                            serverNodeConnector.getnodeConnector(),
+                            edges.get(i).getHeadNodeConnector(),
+                            "src", ipv4Pkt.getDestinationAddress(),
+                            null, ether.getSourceMACAddress(), (short) 0, (short) 500);
+                } else {
+                    flowId2 = pushFlowSingleEntry(initCommand, mt,
+                            edges.get(i+1).getTailNodeConnector(),
+                            edges.get(i).getHeadNodeConnector(),
+                            "none", 0,
+                            null, null, (short) 0, (short) 500);
+                }
             }
             return result;
         }
@@ -275,7 +323,7 @@ public class SecurityControllerAgentImpl extends ComponentActivatorAbstractBase
 
     private String pushFlowSingleEntry(BYODRedirectCommand initCommand,
                                        Match match, NodeConnector previousConnector,
-                                       NodeConnector nextNodeConnector, String action, int ip, byte[] mac,
+                                       NodeConnector nextNodeConnector, String action, int ip, byte[] authSvrMac,
                                        byte[] devMac, short hardTimeout, short idleTimeout) {
         IFlowProgrammerService flowProgrammer = (IFlowProgrammerService) ServiceHelper
                 .getGlobalInstance(IFlowProgrammerService.class, this);
@@ -294,13 +342,11 @@ public class SecurityControllerAgentImpl extends ComponentActivatorAbstractBase
         match.setField(MatchType.IN_PORT, previousConnector);
         ArrayList<Action> actions = new ArrayList<Action>();
         if (action.equals("dst")) {
-            SetDlDst setDlDst = new SetDlDst(mac);
+            SetDlDst setDlDst = new SetDlDst(authSvrMac);
             actions.add(setDlDst);
             SetNwDst setNwDst = new SetNwDst(intToInetAddress(ip));
             actions.add(setNwDst);
         } else if (action.equals("src")) {
-            SetDlSrc setDlSrc = new SetDlSrc(mac);
-            actions.add(setDlSrc);
             SetDlDst setDlDst = new SetDlDst(devMac);
             actions.add(setDlDst);
             SetNwSrc setNwSrc = new SetNwSrc(intToInetAddress(ip));
@@ -313,15 +359,18 @@ public class SecurityControllerAgentImpl extends ComponentActivatorAbstractBase
         flow.setIdleTimeout(idleTimeout);
         flow.setId(0xABCDEFL);
         // priority + 1 to override "HTTP --> controller" flow
-        flow.setPriority((short) (initCommand.getCommandPriority() + 1));
-        Status status = flowProgrammer.addFlow(previousConnector.getNode(),
+        flow.setPriority((short) (initCommand.getCommandPriority() + (short) 1));
+        Status status = flowProgrammer.addFlow(nextNodeConnector.getNode(),
                 flow);
         String flowId = null;
         if (status.isSuccess()) {
+            logger.info("successfully add a flow. flow = {}, node = {}",flow,previousConnector.getNode());
             flowId = Cypher.getMD5(new String[]{
                     previousConnector.getNode().getNodeIDString(),
                     previousConnector.getNodeConnectorIDString() + "",
                     flow.toString()});
+        }else{
+            logger.info("failed to add a flow. flow = {}, node = {}",flow,previousConnector.getNode());
         }
 
         return flowId;
@@ -366,5 +415,11 @@ public class SecurityControllerAgentImpl extends ComponentActivatorAbstractBase
     public PolicyCommand removePolicyCommand(PolicyActionType type, String id) {
         // TODO Auto-generated method stub
         return policyCommands.get(type).remove(id);
+    }
+
+    public static void main(String[] args) {
+        String a = "00:00:52:54:00:22:33:42";
+        byte[] bytes = HexString.fromHexString(a);
+        System.out.println(bytes);
     }
 }

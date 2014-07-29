@@ -517,7 +517,7 @@ public class SCAgentNorthbound {
         } else {
             res = "error";
             throw new InternalServerErrorException(String.format(
-                    "{\"status\":\"error\",\"result\":[\"cannot process flow with id: %d\"]}",
+                    "{\"status\":\"error\",\"result\":\"cannot process flow with id: %s\"}",
                     policyCommand.getId()));
         }
         return res;
