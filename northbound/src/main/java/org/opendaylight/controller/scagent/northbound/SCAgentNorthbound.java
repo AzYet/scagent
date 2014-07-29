@@ -10,8 +10,12 @@ import org.opendaylight.controller.hosttracker.hostAware.HostNodeConnector;
 import org.opendaylight.controller.northbound.commons.RestMessages;
 import org.opendaylight.controller.northbound.commons.exception.InternalServerErrorException;
 import org.opendaylight.controller.northbound.commons.exception.ServiceUnavailableException;
+import org.opendaylight.controller.northbound.commons.exception.UnauthorizedException;
+import org.opendaylight.controller.northbound.commons.query.QueryContext;
+import org.opendaylight.controller.northbound.commons.utils.NorthboundUtils;
 import org.opendaylight.controller.sal.action.Action;
 import org.opendaylight.controller.sal.action.Controller;
+import org.opendaylight.controller.sal.authorization.Privilege;
 import org.opendaylight.controller.sal.core.ConstructionException;
 import org.opendaylight.controller.sal.core.Edge;
 import org.opendaylight.controller.sal.core.Node;
@@ -32,8 +36,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.ws.rs.*;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.SecurityContext;
+import javax.ws.rs.ext.ContextResolver;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.net.InetAddress;
@@ -50,6 +57,23 @@ public class SCAgentNorthbound {
     /**
      * SCAgent northbound
      */
+
+    private String username;
+    private QueryContext queryContext;
+
+    @Context
+    public void setQueryContext(ContextResolver<QueryContext> queryCtxResolver) {
+        if (queryCtxResolver != null) {
+            queryContext = queryCtxResolver.getContext(QueryContext.class);
+        }
+    }
+    @Context
+    public void setSecurityContext(SecurityContext context) {
+        if (context != null && context.getUserPrincipal() != null) username = context.getUserPrincipal().getName();
+    }
+    protected String getUserName() {
+        return username;
+    }
     public static Logger logger = LoggerFactory
             .getLogger(SCAgentNorthbound.class);
 
@@ -200,15 +224,70 @@ public class SCAgentNorthbound {
         return new FindHostsResult("none", (short) 0);
     }*/
 
-    @Path("/scagent/policyaction/{type}/{id}")
+    @Path("/scagent/policyaction/")
     @GET
     @Produces({MediaType.APPLICATION_JSON})
+    @TypeHint(Response.class)
     @StatusCodes({@ResponseCode(code = 200, condition = "operational"),
             @ResponseCode(code = 503, condition = "Internal error"),
             @ResponseCode(code = 503, condition = "misfunctional")})
-    public Response getPolicyByTypeAndId(
-            @PathParam(value = "type") String type, @PathParam(value = "id") String id) {
+    public Response getPolicies(@DefaultValue("") @QueryParam("type") String type,
+                                @DefaultValue("") @QueryParam("id") String id) {
         logger.info("request to list policy type = {}, id = {}", type, id);
+        if (!NorthboundUtils.isAuthorized(getUserName(), "default", Privilege.WRITE, this)) {
+            return Response.ok(String.format(
+                    "{\"status\" : \"ok\", \"result\" : \"%s\"}", "User is not authorized to perform this operation on container")).status(200).build();
+        }
+        ISecurityControllerAgentService scAgentService = (ISecurityControllerAgentService) ServiceHelper
+                .getGlobalInstance(ISecurityControllerAgentService.class, this);
+        Map<PolicyActionType, Map<String, PolicyCommand>> allPolicyCommands = scAgentService.getAllPolicyCommands();
+        Gson gson = new Gson();
+        if(type.equals("") && id.equals("")){
+            return Response.ok(String.format(
+                    "{\"status\" : \"ok\", \"result\" : %s}", gson.toJson(allPolicyCommands))).status(200).build();
+        }else if(!type.equals("")) {
+            PolicyActionType pa;
+            try {
+                pa = PolicyActionType.valueOf(type.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                logger.error("type error: {}, no such policy type", type);
+                return Response.ok(String.format("{\"status\" : \"error\", \"result\" : \"%s\"}", "policy type error")).status(503).build();
+            }
+
+            Map<String, PolicyCommand> typePolicies = allPolicyCommands.get(pa);
+            if(id.equals("")) {
+                Collection<PolicyCommand> values = new ArrayList<>();
+                if (typePolicies != null) {
+                    values.addAll(typePolicies.values());
+                }
+                return Response.ok(String.format(
+                        "{\"status\" : \"ok\", \"result\" : %s}", gson.toJson(values))).status(200).build();
+            }else{
+                if(typePolicies != null)
+                    return Response.ok(String.format(
+                            "{\"status\" : \"ok\", \"result\" : %s}", gson.toJson(typePolicies.get(id)))).status(200).build();
+                else
+                    return Response.ok(String.format("{\"status\" : \"error\", \"result\" : %s}", "null")).status(503).build();
+            }
+        }else{
+            return Response.ok(String.format("{\"status\" : \"error\", \"result\" : %s}", "\"input error\"")).status(503).build();
+        }
+    }
+
+    @Path("/scagent/policyaction/{type2}/{id2}")
+    @DELETE
+    @Produces({MediaType.APPLICATION_JSON})
+    @TypeHint(Response.class)
+    @StatusCodes({@ResponseCode(code = 200, condition = "operational"),
+            @ResponseCode(code = 503, condition = "Internal error"),
+            @ResponseCode(code = 503, condition = "misfunctional")})
+    public Response delPolicyByTypeAndId(
+            @PathParam(value = "type2") String type, @PathParam(value = "id2") String id) {
+        logger.info("request to delete policy type = {}, id = {}", type, id);
+        if (!NorthboundUtils.isAuthorized(getUserName(), "default", Privilege.WRITE, this)) {
+            return Response.ok(String.format(
+                    "{\"status\" : \"ok\", \"result\" : \"%s\"}", "User is not authorized to perform this operation on container")).status(200).build();
+        }
         ISecurityControllerAgentService scAgentService = (ISecurityControllerAgentService) ServiceHelper
                 .getGlobalInstance(ISecurityControllerAgentService.class, this);
         Map<PolicyActionType, Map<String, PolicyCommand>> allPolicyCommands = scAgentService.getAllPolicyCommands();
@@ -221,50 +300,15 @@ public class SCAgentNorthbound {
         }
         Map<String, PolicyCommand> typePolicies = allPolicyCommands.get(pa);
         Gson gson = new Gson();
-        if(id == null){
-            return Response.ok(String.format(
-                    "{\"status\" : \"ok\", \"result\" : %s}", gson.toJson(typePolicies))).status(200).build();
-        }
-        PolicyCommand policyCommand = typePolicies.get(id);
+        PolicyCommand policyCommand = typePolicies.remove(id);
         if(policyCommand != null) {
             return Response.ok(String.format(
                     "{\"status\" : \"ok\", \"result\" : %s}", gson.toJson(policyCommand))).status(200).build();
         }else {
             return Response.ok(String.format(
-                    "{\"status\" : \"ok\", \"result\" : %s}", "null")).status(200).build();
+                    "{\"status\" : \"error\", \"result\" : %s}", "\"no such policy\"")).status(200).build();
         }
     }
-
-    @Path("/scagent/policyaction/{type}")
-    @GET
-    @Produces({MediaType.APPLICATION_JSON})
-    @StatusCodes({@ResponseCode(code = 200, condition = "operational"),
-            @ResponseCode(code = 503, condition = "Internal error"),
-            @ResponseCode(code = 503, condition = "misfunctional")})
-    public Response getPoliciesByType(
-            @PathParam(value = "type") String type) {
-        logger.info("request to list policy type = {}", type);
-        ISecurityControllerAgentService scAgentService = (ISecurityControllerAgentService) ServiceHelper
-                .getGlobalInstance(ISecurityControllerAgentService.class, this);
-        Map<PolicyActionType, Map<String, PolicyCommand>> allPolicyCommands = scAgentService.getAllPolicyCommands();
-        PolicyActionType pa;
-        try {
-            pa = PolicyActionType.valueOf(type.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            logger.error("type error: {}, no such policy type", type);
-            return Response.ok(String.format("{\"status\" : \"error\", \"result\" : \"%s\"}", "no such policy type")).status(503).build();
-        }
-        Map<String, PolicyCommand> typePolicies = allPolicyCommands.get(pa);
-        if(typePolicies != null){
-            Gson gson = new Gson();
-            return Response.ok(String.format(
-                    "{\"status\" : \"ok\", \"result\" : %s}", gson.toJson(typePolicies.values()))).status(200).build();
-        }else{
-            return Response.ok(String.format(
-                    "{\"status\" : \"ok\", \"result\" : %s}", "[]")).status(200).build();
-        }
-    }
-
     /*@Path("/scagent/policyaction/{format}")
     @POST
     @Consumes({MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML})
@@ -333,6 +377,10 @@ public class SCAgentNorthbound {
                                    @TypeHint(BYODInitConfig.class) BYODInitConfig config) {
 
         logger.info("received {} command = {}",type, config.toString());
+        if (!NorthboundUtils.isAuthorized(getUserName(), "default", Privilege.WRITE, this)) {
+            return Response.ok(String.format(
+                    "{\"status\" : \"ok\", \"result\" : \"%s\"}", "User is not authorized to perform this operation on container")).status(200).build();
+        }
         ISecurityControllerAgentService scAgentService = (ISecurityControllerAgentService) ServiceHelper
                 .getGlobalInstance(ISecurityControllerAgentService.class, this);
         if(scAgentService == null){
