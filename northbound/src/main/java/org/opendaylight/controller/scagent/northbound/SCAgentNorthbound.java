@@ -274,15 +274,13 @@ public class SCAgentNorthbound {
         }
     }
 
-    @Path("/scagent/policyaction/{type2}/{id2}")
+    @Path("/scagent/policyaction/{type}/{id}")
     @DELETE
-    @Produces({MediaType.APPLICATION_JSON})
-    @TypeHint(Response.class)
-    @StatusCodes({@ResponseCode(code = 200, condition = "operational"),
+    @StatusCodes({@ResponseCode(code = 204, condition = "operational"),
             @ResponseCode(code = 503, condition = "Internal error"),
             @ResponseCode(code = 503, condition = "misfunctional")})
     public Response delPolicyByTypeAndId(
-            @PathParam(value = "type2") String type, @PathParam(value = "id2") String id) {
+            @PathParam(value = "type") String type, @PathParam(value = "id") String id) {
         logger.info("request to delete policy type = {}, id = {}", type, id);
         if (!NorthboundUtils.isAuthorized(getUserName(), "default", Privilege.WRITE, this)) {
             return Response.ok(String.format(

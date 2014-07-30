@@ -4,7 +4,7 @@
  http://java.sun.com/xml/ns/javaee/web-app_3_0.xsd"
 	version="3.0">
 	<servlet>
-		<servlet-name>JAXRSPing</servlet-name>
+		<servlet-name>JAXRSscAgent</servlet-name>
 		<servlet-class>com.sun.jersey.spi.container.servlet.ServletContainer</servlet-class>
 		<init-param>
 			<param-name>javax.ws.rs.Application</param-name>
@@ -14,7 +14,7 @@
 	</servlet>
 
 	<servlet-mapping>
-		<servlet-name>JAXRSPing</servlet-name>
+		<servlet-name>JAXRSscAgent</servlet-name>
 		<url-pattern>/*</url-pattern>
 	</servlet-mapping>
 
@@ -27,7 +27,7 @@
 		</init-param>
 		<init-param>
 			<param-name>cors.allowed.methods</param-name>
-			<param-value>GET,POST,HEAD,OPTIONS,PUT</param-value>
+			<param-value>GET,POST,HEAD,OPTIONS,PUT,DELETE</param-value>
 		</init-param>
 		<init-param>
 			<param-name>cors.allowed.headers</param-name>

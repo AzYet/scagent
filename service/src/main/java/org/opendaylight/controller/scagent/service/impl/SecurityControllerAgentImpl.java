@@ -153,7 +153,7 @@ public class SecurityControllerAgentImpl extends ComponentActivatorAbstractBase
             return PacketResult.CONSUME;
 
         Ethernet ether = (Ethernet) l2pkt;
-        logger.info("received a ether frame,mac source : {}", HexString.toHexString(ether.getSourceMACAddress()).toString());
+        logger.debug("received a ether frame,mac source : {}", HexString.toHexString(ether.getSourceMACAddress()).toString());
         for (PolicyCommand policyCommand : policyCommands.get(PolicyActionType.BYOD_INIT).values()) {
             BYODRedirectCommand initCommand = (BYODRedirectCommand) policyCommand;
             if ((long) (ingressNode.getID()) != initCommand.getDpid()) {
@@ -221,6 +221,9 @@ public class SecurityControllerAgentImpl extends ComponentActivatorAbstractBase
 
             // first we should try to find the server's NodeConnector, if failure,
             // then no bother to go further
+            logger.info("received an http packet, dl_src = {}, nw_src = {}, nw_dst = {}, tp_src = {} ",
+                    HexString.toHexString(ether.getSourceMACAddress()), intToInetAddress(ipv4Pkt.getSourceAddress()).getHostName(),
+                    intToInetAddress(ipv4Pkt.getDestinationAddress()).getHostName(), tcpPkt.getSourcePort());
             HostNodeConnector serverNodeConnector = null;
             try {
                 serverNodeConnector = hostTracker.hostFind(InetAddress
@@ -420,6 +423,9 @@ public class SecurityControllerAgentImpl extends ComponentActivatorAbstractBase
     public static void main(String[] args) {
         String a = "00:00:52:54:00:22:33:42";
         byte[] bytes = HexString.fromHexString(a);
-        System.out.println(bytes);
+        String hostName = intToInetAddress(234234242).getHostName();
+
+        System.out.println(HexString.toHexString(bytes));
+        System.out.println(hostName);
     }
 }
