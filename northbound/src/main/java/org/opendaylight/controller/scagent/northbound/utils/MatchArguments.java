@@ -53,7 +53,28 @@ public class MatchArguments {
 		this.transportSource = 0;
 	}
 
-	/**
+    public MatchArguments(int wildcards, short inputPort,
+                          byte[] dataLayerSource, byte[] dataLayerDestination,
+                          short dataLayerVirtualLan, byte dataLayerVirtualLanPriorityCodePoint,
+                          short dataLayerType, byte networkTypeOfService, byte networkProtocol,
+                          int networkSource, int networkDestination, short transportSource,
+                          short transportDestination) {
+        this.wildcards = wildcards;
+        this.inputPort = inputPort;
+        this.dataLayerSource = dataLayerSource;
+        this.dataLayerDestination = dataLayerDestination;
+        this.dataLayerVirtualLan = dataLayerVirtualLan;
+        this.dataLayerVirtualLanPriorityCodePoint = dataLayerVirtualLanPriorityCodePoint;
+        this.dataLayerType = dataLayerType;
+        this.networkTypeOfService = networkTypeOfService;
+        this.networkProtocol = networkProtocol;
+        this.networkSource = networkSource;
+        this.networkDestination = networkDestination;
+        this.transportSource = transportSource;
+        this.transportDestination = transportDestination;
+    }
+
+    /**
 	 * 
 	 * @return an OFMatch object without in_port
 	 */

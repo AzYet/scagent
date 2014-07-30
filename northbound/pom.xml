@@ -34,6 +34,7 @@
             org.apache.catalina.filters,
             com.google.gson,
             com.fasterxml.jackson.jaxrs.base,
+            com.fasterxml.jackson.databind,
             com.fasterxml.jackson.core,
             com.fasterxml.jackson.jaxrs.json,
             !org.codehaus.enunciate.jaxrs
